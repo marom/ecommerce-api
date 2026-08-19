@@ -28,11 +28,15 @@ import com.marom.ecommerce.api.repository.OrderRepository;
 import com.marom.ecommerce.api.repository.ProductRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class OrderService {
+
+    private static final int LOW_STOCK_THRESHOLD = 10;
 
     // Business rule: order status transitions are one-way. Each key lists the only statuses
     // reachable from it; DELIVERED, CANCELLED and REFUNDED have no entry and are therefore final.
@@ -63,7 +67,11 @@ public class OrderService {
             Product product = productRepository.findById(itemRequest.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found with id " + itemRequest.getProductId()));
 
-            productService.reduceStock(product, itemRequest.getQuantity());
+            Product updatedProduct = productService.reduceStock(product, itemRequest.getQuantity());
+            if (updatedProduct.getStockQuantity() < LOW_STOCK_THRESHOLD) {
+                log.warn("Low stock alert: {} has {} units left", updatedProduct.getName(),
+                        updatedProduct.getStockQuantity());
+            }
 
             OrderItem item = OrderItem.builder()
                     .product(product)

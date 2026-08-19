@@ -5,11 +5,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 
 import com.marom.ecommerce.api.dto.OrderItemRequest;
 import com.marom.ecommerce.api.dto.OrderRequest;
@@ -30,6 +38,7 @@ import com.marom.ecommerce.api.repository.ProductRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -53,6 +62,20 @@ class OrderServiceTest {
 
     @InjectMocks
     private OrderService orderService;
+
+    private ListAppender<ILoggingEvent> logAppender;
+
+    @BeforeEach
+    void attachLogAppender() {
+        logAppender = new ListAppender<>();
+        logAppender.start();
+        ((Logger) LoggerFactory.getLogger(OrderService.class)).addAppender(logAppender);
+    }
+
+    @AfterEach
+    void detachLogAppender() {
+        ((Logger) LoggerFactory.getLogger(OrderService.class)).detachAppender(logAppender);
+    }
 
     private static Customer customer() {
         return Customer.builder().id(1L).firstName("John").lastName("Doe").email("john.doe@example.com").build();
@@ -147,6 +170,52 @@ class OrderServiceTest {
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Insufficient stock");
         verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void should_logLowStockWarning_when_remainingStockBelowThreshold() {
+        // Arrange
+        Product mouse = Product.builder().id(1L).name("Wireless Mouse").price(new BigDecimal("24.99")).stockQuantity(9).build();
+        OrderRequest request = OrderRequest.builder()
+                .customerId(1L)
+                .shippingAddress("123 Maple Street")
+                .paymentMethod(PaymentMethod.CREDIT_CARD)
+                .items(List.of(OrderItemRequest.builder().productId(1L).quantity(1).build()))
+                .build();
+        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer()));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(mouse));
+        when(productService.reduceStock(mouse, 1)).thenReturn(mouse);
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        orderService.placeOrder(request);
+
+        // Assert
+        assertThat(logAppender.list)
+                .extracting(ILoggingEvent::getLevel, ILoggingEvent::getFormattedMessage)
+                .contains(tuple(Level.WARN, "Low stock alert: Wireless Mouse has 9 units left"));
+    }
+
+    @Test
+    void should_notLogLowStockWarning_when_remainingStockAtOrAboveThreshold() {
+        // Arrange
+        Product mouse = Product.builder().id(1L).name("Wireless Mouse").price(new BigDecimal("24.99")).stockQuantity(10).build();
+        OrderRequest request = OrderRequest.builder()
+                .customerId(1L)
+                .shippingAddress("123 Maple Street")
+                .paymentMethod(PaymentMethod.CREDIT_CARD)
+                .items(List.of(OrderItemRequest.builder().productId(1L).quantity(1).build()))
+                .build();
+        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer()));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(mouse));
+        when(productService.reduceStock(mouse, 1)).thenReturn(mouse);
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        orderService.placeOrder(request);
+
+        // Assert
+        assertThat(logAppender.list).noneMatch(event -> event.getLevel() == Level.WARN);
     }
 
     @Test
