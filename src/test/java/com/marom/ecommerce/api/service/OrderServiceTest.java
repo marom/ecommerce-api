@@ -95,8 +95,7 @@ class OrderServiceTest {
                         OrderItemRequest.builder().productId(2L).quantity(1).build()))
                 .build();
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer()));
-        when(productRepository.findById(1L)).thenReturn(Optional.of(mouse));
-        when(productRepository.findById(2L)).thenReturn(Optional.of(keyboard));
+        when(productRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(mouse, keyboard));
         when(productService.reduceStock(mouse, 2)).thenReturn(mouse);
         when(productService.reduceStock(keyboard, 1)).thenReturn(keyboard);
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -127,7 +126,7 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.placeOrder(request))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("404");
-        verify(productRepository, never()).findById(any());
+        verify(productRepository, never()).findAllById(any());
         verify(orderRepository, never()).save(any());
     }
 
@@ -141,7 +140,7 @@ class OrderServiceTest {
                 .items(List.of(OrderItemRequest.builder().productId(404L).quantity(1).build()))
                 .build();
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer()));
-        when(productRepository.findById(404L)).thenReturn(Optional.empty());
+        when(productRepository.findAllById(List.of(404L))).thenReturn(List.of());
 
         // Act & Assert
         assertThatThrownBy(() -> orderService.placeOrder(request))
@@ -161,7 +160,7 @@ class OrderServiceTest {
                 .items(List.of(OrderItemRequest.builder().productId(1L).quantity(10).build()))
                 .build();
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer()));
-        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(productRepository.findAllById(List.of(1L))).thenReturn(List.of(product));
         when(productService.reduceStock(product, 10))
                 .thenThrow(new BusinessRuleException("Insufficient stock for product 'Wireless Mouse': requested 10, available 2"));
 
@@ -183,7 +182,7 @@ class OrderServiceTest {
                 .items(List.of(OrderItemRequest.builder().productId(1L).quantity(1).build()))
                 .build();
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer()));
-        when(productRepository.findById(1L)).thenReturn(Optional.of(mouse));
+        when(productRepository.findAllById(List.of(1L))).thenReturn(List.of(mouse));
         when(productService.reduceStock(mouse, 1)).thenReturn(mouse);
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -207,7 +206,7 @@ class OrderServiceTest {
                 .items(List.of(OrderItemRequest.builder().productId(1L).quantity(1).build()))
                 .build();
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer()));
-        when(productRepository.findById(1L)).thenReturn(Optional.of(mouse));
+        when(productRepository.findAllById(List.of(1L))).thenReturn(List.of(mouse));
         when(productService.reduceStock(mouse, 1)).thenReturn(mouse);
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 

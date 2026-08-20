@@ -90,6 +90,20 @@ CREATE TABLE payments (
     CONSTRAINT fk_payments_order FOREIGN KEY (order_id) REFERENCES orders (id)
 );
 
+-- reviews
+CREATE TABLE reviews (
+    id          BIGINT NOT NULL AUTO_INCREMENT,
+    product_id  BIGINT NOT NULL,
+    customer_id BIGINT NOT NULL,
+    rating      INT    NOT NULL,
+    comment     TEXT   NOT NULL,
+    created_at  DATETIME,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_reviews_product_customer (product_id, customer_id),
+    CONSTRAINT fk_reviews_product  FOREIGN KEY (product_id)  REFERENCES products  (id),
+    CONSTRAINT fk_reviews_customer FOREIGN KEY (customer_id) REFERENCES customers (id)
+);
+
 -- indexes
 CREATE INDEX idx_products_category   ON products    (category_id);
 CREATE INDEX idx_products_active     ON products    (active);
@@ -131,6 +145,13 @@ INSERT INTO customers (first_name, last_name, email, phone, address, created_at)
 ('Jane',  'Smith', 'jane.smith@example.com', '+1-202-555-0142', '88 Oak Avenue, Riverdale',       NOW()),
 ('Ravi',  'Kumar', 'ravi.kumar@example.com', '+91-90000-12345', '12 MG Road, Bengaluru',          NOW());
 
+-- reviews
+INSERT INTO reviews (product_id, customer_id, rating, comment, created_at) VALUES
+(1, 1, 5, 'Great mouse, very responsive and comfortable to use daily.', NOW()),
+(1, 2, 4, 'Works well but the scroll wheel feels a bit loose.', NOW()),
+(2, 1, 5, 'Best mechanical keyboard I have owned, love the RGB backlighting.', NOW()),
+(5, 3, 5, 'A must-read for every software engineer, highly recommended.', NOW());
+
 -- ---------------------------------------------------------------------------
 -- Verification (run after the script to confirm the seed loaded)
 -- ---------------------------------------------------------------------------
@@ -140,3 +161,4 @@ SELECT * FROM customers;
 SELECT * FROM orders;
 SELECT * FROM order_items;
 SELECT * FROM payments;
+SELECT * FROM reviews;

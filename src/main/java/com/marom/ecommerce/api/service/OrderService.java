@@ -5,6 +5,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,10 +64,16 @@ public class OrderService {
                 .notes(request.getNotes())
                 .build();
 
+        List<Long> productIds = request.getItems().stream().map(OrderItemRequest::getProductId).toList();
+        Map<Long, Product> productsById = productRepository.findAllById(productIds).stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
+
         BigDecimal total = BigDecimal.ZERO;
         for (OrderItemRequest itemRequest : request.getItems()) {
-            Product product = productRepository.findById(itemRequest.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id " + itemRequest.getProductId()));
+            Product product = productsById.get(itemRequest.getProductId());
+            if (product == null) {
+                throw new ResourceNotFoundException("Product not found with id " + itemRequest.getProductId());
+            }
 
             Product updatedProduct = productService.reduceStock(product, itemRequest.getQuantity());
             if (updatedProduct.getStockQuantity() < LOW_STOCK_THRESHOLD) {
