@@ -157,6 +157,103 @@ class ProductServiceTest {
     }
 
     @Test
+    void should_updateProduct_when_requestIsValid() {
+        // Arrange
+        ProductRequest request = ProductRequest.builder()
+                .name("Wireless Mouse Pro")
+                .price(new BigDecimal("34.99"))
+                .sku("ELEC-MOU-002")
+                .stockQuantity(200)
+                .active(true)
+                .categoryId(1L)
+                .build();
+        Product existing = Product.builder().id(1L).name("Wireless Mouse").sku("ELEC-MOU-001")
+                .price(new BigDecimal("24.99")).stockQuantity(150).active(true).category(category()).build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(productRepository.findBySku("ELEC-MOU-002")).thenReturn(Optional.empty());
+        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category()));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        ProductResponse response = productService.updateProduct(1L, request);
+
+        // Assert
+        assertThat(response.getName()).isEqualTo("Wireless Mouse Pro");
+        assertThat(response.getSku()).isEqualTo("ELEC-MOU-002");
+        assertThat(response.getStockQuantity()).isEqualTo(200);
+    }
+
+    @Test
+    void should_throwResourceNotFoundException_when_productDoesNotExistOnUpdate() {
+        // Arrange
+        ProductRequest request = ProductRequest.builder()
+                .name("Wireless Mouse Pro")
+                .price(new BigDecimal("34.99"))
+                .sku("ELEC-MOU-002")
+                .stockQuantity(200)
+                .active(true)
+                .categoryId(1L)
+                .build();
+        when(productRepository.findById(404L)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThatThrownBy(() -> productService.updateProduct(404L, request))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("404");
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void should_updateProduct_when_skuIsUnchanged() {
+        // Arrange
+        ProductRequest request = ProductRequest.builder()
+                .name("Wireless Mouse Pro")
+                .price(new BigDecimal("34.99"))
+                .sku("ELEC-MOU-001")
+                .stockQuantity(200)
+                .active(true)
+                .categoryId(1L)
+                .build();
+        Product existing = Product.builder().id(1L).name("Wireless Mouse").sku("ELEC-MOU-001")
+                .price(new BigDecimal("24.99")).stockQuantity(150).active(true).category(category()).build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(productRepository.findBySku("ELEC-MOU-001")).thenReturn(Optional.of(existing));
+        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category()));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        ProductResponse response = productService.updateProduct(1L, request);
+
+        // Assert
+        assertThat(response.getName()).isEqualTo("Wireless Mouse Pro");
+        assertThat(response.getSku()).isEqualTo("ELEC-MOU-001");
+    }
+
+    @Test
+    void should_throwDuplicateResourceException_when_skuBelongsToAnotherProductOnUpdate() {
+        // Arrange
+        ProductRequest request = ProductRequest.builder()
+                .name("Wireless Mouse Pro")
+                .price(new BigDecimal("34.99"))
+                .sku("ELEC-KEY-001")
+                .stockQuantity(200)
+                .active(true)
+                .categoryId(1L)
+                .build();
+        Product existing = Product.builder().id(1L).sku("ELEC-MOU-001").category(category()).build();
+        Product other = Product.builder().id(2L).sku("ELEC-KEY-001").category(category()).build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(productRepository.findBySku("ELEC-KEY-001")).thenReturn(Optional.of(other));
+
+        // Act & Assert
+        assertThatThrownBy(() -> productService.updateProduct(1L, request))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessageContaining("ELEC-KEY-001");
+        verify(categoryRepository, never()).findById(any());
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
     void should_deleteProduct_when_productExists() {
         // Arrange
         Product product = Product.builder().id(1L).category(category()).build();
