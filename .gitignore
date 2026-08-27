@@ -46,3 +46,6 @@ application-local.yaml
 ### Claude Code ###
 .claude/settings.local.json
 .claude/logs/
+
+### Playwright MCP ###
+.playwright-mcp/
