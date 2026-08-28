@@ -1,0 +1,16 @@
+target/
+!**/src/
+.git/
+.gitignore
+.github/
+.claude/
+.mvn/wrapper/maven-wrapper.jar
+*.md
+HELP.md
+.idea/
+*.iml
+.vscode/
+.playwright-mcp/
+db/
+Dockerfile
+.dockerignore
