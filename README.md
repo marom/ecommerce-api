@@ -1,7 +1,7 @@
 # ecommerce-api
 
 A small REST API for an e-commerce catalog and ordering flow — products,
-categories, customers, orders, payments, and product reviews.
+categories, customers, orders, payments, product reviews, and product pictures.
 
 ## Stack
 
@@ -125,6 +125,11 @@ token.
 | `PUT`    | `/api/v1/payments/{id}/complete` | `ROLE_ADMIN` | Mark a payment complete |
 | `GET`    | `/api/v1/products/{productId}/reviews` | public | List reviews for a product |
 | `POST`   | `/api/v1/products/{productId}/reviews` | `ROLE_CUSTOMER` | Post a review (as the caller; one per product) |
+| `GET`    | `/api/v1/products/{productId}/pictures` | public | List a product's pictures |
+| `GET`    | `/api/v1/products/{productId}/pictures/{id}/content` | public | Download a picture's raw bytes |
+| `POST`   | `/api/v1/products/{productId}/pictures` | `ROLE_ADMIN` | Upload one or more pictures (`multipart/form-data`, `files` parts) |
+| `PUT`    | `/api/v1/products/{productId}/pictures/{id}` | `ROLE_ADMIN` | Update a picture's alt text / display order |
+| `DELETE` | `/api/v1/products/{productId}/pictures/{id}` | `ROLE_ADMIN` | Delete a picture |
 | `GET`    | `/api/v1/users` | `ROLE_ADMIN` | List user accounts |
 | `PUT`    | `/api/v1/users/{id}/role` | `ROLE_ADMIN` | Change a user's role |
 

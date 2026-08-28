@@ -1,10 +1,13 @@
 package com.marom.ecommerce.api.service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.marom.ecommerce.api.dto.ProductPictureResponse;
 import com.marom.ecommerce.api.dto.ProductRequest;
 import com.marom.ecommerce.api.dto.ProductResponse;
 import com.marom.ecommerce.api.entity.Category;
@@ -13,6 +16,7 @@ import com.marom.ecommerce.api.exception.BusinessRuleException;
 import com.marom.ecommerce.api.exception.DuplicateResourceException;
 import com.marom.ecommerce.api.exception.ResourceNotFoundException;
 import com.marom.ecommerce.api.repository.CategoryRepository;
+import com.marom.ecommerce.api.repository.ProductPictureRepository;
 import com.marom.ecommerce.api.repository.ProductRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -24,6 +28,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final ProductPictureRepository productPictureRepository;
 
     public ProductResponse createProduct(ProductRequest request) {
         assertSkuAvailable(request.getSku(), null);
@@ -48,7 +53,16 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public List<ProductResponse> getAllProducts() {
-        return productRepository.findAll().stream().map(this::toResponse).toList();
+        List<Product> products = productRepository.findAll();
+        List<Long> ids = products.stream().map(Product::getId).toList();
+        Map<Long, List<ProductPictureResponse>> picturesByProduct = ids.isEmpty()
+                ? Map.of()
+                : productPictureRepository.findViewsByProductIdIn(ids).stream()
+                        .map(ProductPictureService::toResponse)
+                        .collect(Collectors.groupingBy(ProductPictureResponse::getProductId));
+        return products.stream()
+                .map(product -> toResponse(product, picturesByProduct.getOrDefault(product.getId(), List.of())))
+                .toList();
     }
 
     public ProductResponse updateProduct(Long id, ProductRequest request) {
@@ -67,7 +81,9 @@ public class ProductService {
     }
 
     public void deleteProduct(Long id) {
-        productRepository.delete(findProductOrThrow(id));
+        Product product = findProductOrThrow(id);
+        productPictureRepository.deleteByProductId(id);
+        productRepository.delete(product);
     }
 
     // Business rule: stock is reduced when the order is placed, not at shipment — called from
@@ -108,6 +124,13 @@ public class ProductService {
     }
 
     private ProductResponse toResponse(Product product) {
+        List<ProductPictureResponse> pictures = productPictureRepository.findViewsByProductId(product.getId()).stream()
+                .map(ProductPictureService::toResponse)
+                .toList();
+        return toResponse(product, pictures);
+    }
+
+    private ProductResponse toResponse(Product product, List<ProductPictureResponse> pictures) {
         return ProductResponse.builder()
                 .id(product.getId())
                 .name(product.getName())
@@ -118,6 +141,7 @@ public class ProductService {
                 .active(product.getActive())
                 .categoryId(product.getCategory().getId())
                 .categoryName(product.getCategory().getName())
+                .pictures(pictures)
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
                 .build();

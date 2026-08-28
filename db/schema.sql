@@ -34,6 +34,22 @@ CREATE TABLE products (
     CONSTRAINT fk_products_category FOREIGN KEY (category_id) REFERENCES categories (id)
 );
 
+-- product_pictures
+CREATE TABLE product_pictures (
+    id                BIGINT       NOT NULL AUTO_INCREMENT,
+    product_id        BIGINT       NOT NULL,
+    data              LONGBLOB     NOT NULL,          -- raw image bytes
+    content_type      VARCHAR(100) NOT NULL,          -- 'image/jpeg' | 'image/png' | 'image/webp'
+    size_bytes        BIGINT       NOT NULL,
+    original_filename VARCHAR(255),
+    alt_text          VARCHAR(255),
+    display_order     INT          NOT NULL DEFAULT 0, -- lowest value is the primary picture
+    created_at        DATETIME,
+    updated_at        DATETIME,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_product_pictures_product FOREIGN KEY (product_id) REFERENCES products (id)
+);
+
 -- customers
 CREATE TABLE customers (
     id         BIGINT        NOT NULL AUTO_INCREMENT,
@@ -122,6 +138,7 @@ CREATE TABLE reviews (
 -- indexes
 CREATE INDEX idx_products_category   ON products    (category_id);
 CREATE INDEX idx_products_active     ON products    (active);
+CREATE INDEX idx_product_pictures_product ON product_pictures (product_id);
 CREATE INDEX idx_orders_customer     ON orders      (customer_id);
 CREATE INDEX idx_orders_status       ON orders      (status);
 CREATE INDEX idx_order_items_order   ON order_items (order_id);
@@ -188,6 +205,7 @@ INSERT INTO reviews (product_id, customer_id, rating, comment, created_at) VALUE
 -- ---------------------------------------------------------------------------
 SELECT * FROM categories;
 SELECT * FROM products;
+SELECT * FROM product_pictures;
 SELECT * FROM customers;
 SELECT * FROM users;
 SELECT * FROM orders;

@@ -13,6 +13,7 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import com.marom.ecommerce.api.dto.ErrorResponse;
 
@@ -59,6 +60,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({DisabledException.class, LockedException.class})
     public ResponseEntity<ErrorResponse> handleDisabled(RuntimeException ex, HttpServletRequest request) {
         return build(HttpStatus.UNAUTHORIZED, "Account is disabled", request, null);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException ex,
+            HttpServletRequest request) {
+        return build(HttpStatus.PAYLOAD_TOO_LARGE, "Uploaded file is too large", request, null);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

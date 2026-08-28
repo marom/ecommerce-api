@@ -14,6 +14,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.marom.ecommerce.api.dto.ProductPictureResponse;
 import com.marom.ecommerce.api.dto.ProductRequest;
 import com.marom.ecommerce.api.dto.ProductResponse;
 import com.marom.ecommerce.api.exception.DuplicateResourceException;
@@ -72,6 +73,9 @@ class ProductControllerTest {
                 .active(true)
                 .categoryId(1L)
                 .categoryName("Electronics")
+                .pictures(List.of(ProductPictureResponse.builder()
+                        .id(7L).productId(1L).url("/api/v1/products/1/pictures/7/content")
+                        .displayOrder(0).contentType("image/jpeg").sizeBytes(3L).build()))
                 .build();
     }
 
@@ -275,7 +279,8 @@ class ProductControllerTest {
         mockMvc.perform(get("/api/v1/products/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.sku").value("WM-1000"));
+                .andExpect(jsonPath("$.sku").value("WM-1000"))
+                .andExpect(jsonPath("$.pictures[0].url").value("/api/v1/products/1/pictures/7/content"));
     }
 
     @Test
