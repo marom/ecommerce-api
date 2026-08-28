@@ -1,0 +1,53 @@
+{
+  "skill_name": "production-readiness-check",
+  "evals": [
+    {
+      "id": 1,
+      "eval_name": "deploy-blockers-friday",
+      "prompt": "Is this codebase production ready? We're planning to deploy by Friday and I want to know what's blocking us.",
+      "expected_output": "A consolidated readiness report covering N+1 risk, transactional coverage, DTO coverage, exception handling, config/security hygiene, and test coverage, ending with a short verdict naming concrete blockers if any exist.",
+      "files": [],
+      "assertions": [
+        "flags-missing-controller-tests",
+        "confirms-ddl-auto-validate",
+        "confirms-valid-annotation-present",
+        "confirms-dto-coverage-clean",
+        "confirms-exception-handling-complete",
+        "includes-all-six-categories",
+        "ends-with-concise-verdict"
+      ]
+    },
+    {
+      "id": 2,
+      "eval_name": "pre-launch-release-pr",
+      "prompt": "Do a pre-launch readiness check on the ecommerce API before we open the release PR.",
+      "expected_output": "Same consolidated report structure, with findings grounded in this specific repo (file:line references where applicable).",
+      "files": [],
+      "assertions": [
+        "flags-missing-controller-tests",
+        "confirms-ddl-auto-validate",
+        "confirms-valid-annotation-present",
+        "confirms-dto-coverage-clean",
+        "confirms-exception-handling-complete",
+        "includes-all-six-categories",
+        "ends-with-concise-verdict"
+      ]
+    },
+    {
+      "id": 3,
+      "eval_name": "merge-to-main-audit",
+      "prompt": "Before I merge this into main, can you audit it for anything that would bite us in production?",
+      "expected_output": "Same consolidated report structure; should still trigger the skill even though the prompt doesn't use the words 'production readiness'.",
+      "files": [],
+      "assertions": [
+        "flags-missing-controller-tests",
+        "confirms-ddl-auto-validate",
+        "confirms-valid-annotation-present",
+        "confirms-dto-coverage-clean",
+        "confirms-exception-handling-complete",
+        "includes-all-six-categories",
+        "ends-with-concise-verdict"
+      ]
+    }
+  ]
+}

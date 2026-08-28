@@ -46,6 +46,8 @@ application-local.yaml
 ### Claude Code ###
 .claude/settings.local.json
 .claude/logs/
+# skill-creator benchmark run artifacts; keep only skill-snapshot-*/
+.claude/skills/*-workspace/iteration-*/
 
 ### Playwright MCP ###
 .playwright-mcp/
