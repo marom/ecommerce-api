@@ -38,8 +38,10 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Load db/schema.sql
-        run: mysql -h 127.0.0.1 -P 3306 -uroot -proot < db/schema.sql
+      - name: Load database schema and demo data
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -uroot -proot < db/schema.sql
+          mysql -h 127.0.0.1 -P 3306 -uroot -proot < db/example-data.sql
 
       - name: Run Maven tests
         env:

@@ -63,9 +63,10 @@ All handled in `GlobalExceptionHandler`, returning `ErrorResponse` JSON:
 
 ## Database
 - MySQL, database `ecommerce_db`.
-- `ddl-auto=validate` — tables come from `schema.sql`, not Hibernate. Any new
-  table/column (e.g. `product_pictures`) must be hand-added to `db/schema.sql` or startup
-  validation fails.
+- `ddl-auto=validate` — tables come from `db/schema.sql` (DDL only), not Hibernate. Any new
+  table/column (e.g. `product_pictures`) must be hand-added there or startup validation
+  fails. Demo/seed rows live in `db/example-data.sql`, loaded after `schema.sql`
+  (docker-compose and CI load both).
 
 ## Commands
 - Run: `./mvnw spring-boot:run`

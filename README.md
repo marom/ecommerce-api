@@ -26,7 +26,8 @@ src/main/java/com/marom/ecommerce/api/
   exception/    custom exceptions + GlobalExceptionHandler
   config/       app configuration (SecurityConfig, CorsConfig, OpenApiConfig)
   security/     JWT issue/validate, current-user resolution, 401/403 handlers
-db/schema.sql   authoritative schema + seed data
+db/schema.sql        authoritative schema (DDL only)
+db/example-data.sql  demo rows: reference data + demo accounts
 ```
 
 ## Configuration
@@ -41,7 +42,8 @@ spring.jpa.hibernate.ddl-auto=validate
 ```
 
 `ddl-auto=validate` means the schema is **not** managed by Hibernate — load
-`db/schema.sql` yourself (or use Docker Compose, which does it for you).
+`db/schema.sql` (then `db/example-data.sql` for demo rows) yourself, or use
+Docker Compose, which does it for you.
 Any property can be overridden with an environment variable, e.g.
 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`.
 
@@ -63,7 +65,8 @@ docker compose up -d --build
 
 - API on <http://localhost:8080>, MySQL on host port **3307** (to avoid clashing
   with a local 3306).
-- MySQL loads `db/schema.sql` on first start; data persists in the `mysql-data` volume.
+- MySQL loads `db/schema.sql` then `db/example-data.sql` on first start; data
+  persists in the `mysql-data` volume.
 - The API container waits for MySQL to pass a health check before starting.
 - Secrets live in `.env` (gitignored); the compose file holds only `${VAR}` references.
 
@@ -75,7 +78,8 @@ docker compose down -v    # stop and wipe the database volume
 ### Locally against your own MySQL
 
 ```bash
-mysql -u root < db/schema.sql          # creates ecommerce_db + seed data
+mysql -u root < db/schema.sql          # creates ecommerce_db + all tables
+mysql -u root < db/example-data.sql    # loads demo rows + accounts
 ./mvnw spring-boot:run
 ```
 
@@ -89,7 +93,7 @@ Stateless JWT bearer tokens. `POST /api/v1/auth/login` returns
 `{ "accessToken": "...", "tokenType": "Bearer", "expiresIn": 3600, "role": "...", "customerId": ... }`;
 send it as `Authorization: Bearer <token>` on protected calls.
 
-Seeded accounts (`db/schema.sql`, **demo passwords — change before any real use**):
+Seeded accounts (`db/example-data.sql`, **demo passwords — change before any real use**):
 
 | Email | Password | Role | Linked customer |
 |---|---|---|---|
