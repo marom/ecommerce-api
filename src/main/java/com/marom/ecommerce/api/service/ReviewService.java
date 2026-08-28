@@ -27,10 +27,10 @@ public class ReviewService {
     private final ProductRepository productRepository;
     private final CustomerRepository customerRepository;
 
-    public ReviewResponse createReview(Long productId, ReviewRequest request) {
-        assertNoDuplicateReview(productId, request.getCustomerId());
+    public ReviewResponse createReview(Long productId, Long customerId, ReviewRequest request) {
+        assertNoDuplicateReview(productId, customerId);
         Product product = findProductOrThrow(productId);
-        Customer customer = findCustomerOrThrow(request.getCustomerId());
+        Customer customer = findCustomerOrThrow(customerId);
 
         Review review = Review.builder()
                 .product(product)

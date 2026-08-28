@@ -16,6 +16,7 @@ import com.marom.ecommerce.api.dto.ErrorResponse;
 import com.marom.ecommerce.api.dto.OrderRequest;
 import com.marom.ecommerce.api.dto.OrderResponse;
 import com.marom.ecommerce.api.dto.OrderStatusRequest;
+import com.marom.ecommerce.api.security.CurrentUserService;
 import com.marom.ecommerce.api.service.OrderService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,12 +36,19 @@ import lombok.RequiredArgsConstructor;
 public class OrderController {
 
     private final OrderService orderService;
+    private final CurrentUserService currentUser;
 
     @PostMapping
-    @Operation(summary = "Place an order", description = "Reduces stock for each ordered product and creates a pending payment")
+    @Operation(summary = "Place an order",
+            description = "Placed as the authenticated customer. Reduces stock for each ordered product "
+                    + "and creates a pending payment.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Order placed"),
             @ApiResponse(responseCode = "400", description = "Validation failed",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Not authenticated",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Caller is not a customer",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "Customer or product not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
@@ -48,25 +56,38 @@ public class OrderController {
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     public ResponseEntity<OrderResponse> placeOrder(@Valid @RequestBody OrderRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.placeOrder(request));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(orderService.placeOrder(currentUser.currentCustomerId(), request));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get an order by ID")
+    @Operation(summary = "Get an order by ID",
+            description = "Admins may read any order; customers only their own.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Order found"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Order belongs to another customer",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "Order not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     public ResponseEntity<OrderResponse> get(@Parameter(description = "Order ID") @PathVariable Long id) {
-        return ResponseEntity.ok(orderService.getOrder(id));
+        OrderResponse order = currentUser.isAdmin()
+                ? orderService.getOrder(id)
+                : orderService.getOrderForCustomer(id, currentUser.currentCustomerId());
+        return ResponseEntity.ok(order);
     }
 
     @GetMapping
-    @Operation(summary = "List all orders")
+    @Operation(summary = "List orders",
+            description = "Admins see every order; customers see only their own.")
     @ApiResponse(responseCode = "200", description = "Orders retrieved")
     public ResponseEntity<List<OrderResponse>> getAll() {
-        return ResponseEntity.ok(orderService.getAllOrders());
+        List<OrderResponse> orders = currentUser.isAdmin()
+                ? orderService.getAllOrders()
+                : orderService.getOrdersForCustomer(currentUser.currentCustomerId());
+        return ResponseEntity.ok(orders);
     }
 
     @PutMapping("/{id}/status")

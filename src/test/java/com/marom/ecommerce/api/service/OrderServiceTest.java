@@ -30,6 +30,7 @@ import com.marom.ecommerce.api.entity.Payment;
 import com.marom.ecommerce.api.entity.PaymentMethod;
 import com.marom.ecommerce.api.entity.PaymentStatus;
 import com.marom.ecommerce.api.entity.Product;
+import com.marom.ecommerce.api.exception.AccessDeniedException;
 import com.marom.ecommerce.api.exception.BusinessRuleException;
 import com.marom.ecommerce.api.exception.ResourceNotFoundException;
 import com.marom.ecommerce.api.repository.CustomerRepository;
@@ -81,19 +82,22 @@ class OrderServiceTest {
         return Customer.builder().id(1L).firstName("John").lastName("Doe").email("john.doe@example.com").build();
     }
 
+    private static OrderRequest orderRequest(List<OrderItemRequest> items) {
+        return OrderRequest.builder()
+                .shippingAddress("123 Maple Street")
+                .paymentMethod(PaymentMethod.CREDIT_CARD)
+                .items(items)
+                .build();
+    }
+
     @Test
     void should_placeOrder_when_requestIsValid() {
         // Arrange
         Product mouse = Product.builder().id(1L).name("Wireless Mouse").price(new BigDecimal("24.99")).stockQuantity(150).build();
         Product keyboard = Product.builder().id(2L).name("Mechanical Keyboard").price(new BigDecimal("79.99")).stockQuantity(80).build();
-        OrderRequest request = OrderRequest.builder()
-                .customerId(1L)
-                .shippingAddress("123 Maple Street")
-                .paymentMethod(PaymentMethod.CREDIT_CARD)
-                .items(List.of(
-                        OrderItemRequest.builder().productId(1L).quantity(2).build(),
-                        OrderItemRequest.builder().productId(2L).quantity(1).build()))
-                .build();
+        OrderRequest request = orderRequest(List.of(
+                OrderItemRequest.builder().productId(1L).quantity(2).build(),
+                OrderItemRequest.builder().productId(2L).quantity(1).build()));
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer()));
         when(productRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(mouse, keyboard));
         when(productService.reduceStock(mouse, 2)).thenReturn(mouse);
@@ -101,7 +105,7 @@ class OrderServiceTest {
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        OrderResponse response = orderService.placeOrder(request);
+        OrderResponse response = orderService.placeOrder(1L, request);
 
         // Assert
         assertThat(response.getStatus()).isEqualTo(OrderStatus.PENDING);
@@ -114,16 +118,11 @@ class OrderServiceTest {
     @Test
     void should_throwResourceNotFoundException_when_customerNotFound() {
         // Arrange
-        OrderRequest request = OrderRequest.builder()
-                .customerId(404L)
-                .shippingAddress("123 Maple Street")
-                .paymentMethod(PaymentMethod.CREDIT_CARD)
-                .items(List.of(OrderItemRequest.builder().productId(1L).quantity(1).build()))
-                .build();
+        OrderRequest request = orderRequest(List.of(OrderItemRequest.builder().productId(1L).quantity(1).build()));
         when(customerRepository.findById(404L)).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> orderService.placeOrder(request))
+        assertThatThrownBy(() -> orderService.placeOrder(404L, request))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("404");
         verify(productRepository, never()).findAllById(any());
@@ -133,17 +132,12 @@ class OrderServiceTest {
     @Test
     void should_throwResourceNotFoundException_when_productNotFound() {
         // Arrange
-        OrderRequest request = OrderRequest.builder()
-                .customerId(1L)
-                .shippingAddress("123 Maple Street")
-                .paymentMethod(PaymentMethod.CREDIT_CARD)
-                .items(List.of(OrderItemRequest.builder().productId(404L).quantity(1).build()))
-                .build();
+        OrderRequest request = orderRequest(List.of(OrderItemRequest.builder().productId(404L).quantity(1).build()));
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer()));
         when(productRepository.findAllById(List.of(404L))).thenReturn(List.of());
 
         // Act & Assert
-        assertThatThrownBy(() -> orderService.placeOrder(request))
+        assertThatThrownBy(() -> orderService.placeOrder(1L, request))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("404");
         verify(orderRepository, never()).save(any());
@@ -153,19 +147,14 @@ class OrderServiceTest {
     void should_throwBusinessRuleException_when_stockInsufficient() {
         // Arrange
         Product product = Product.builder().id(1L).name("Wireless Mouse").price(new BigDecimal("24.99")).stockQuantity(2).build();
-        OrderRequest request = OrderRequest.builder()
-                .customerId(1L)
-                .shippingAddress("123 Maple Street")
-                .paymentMethod(PaymentMethod.CREDIT_CARD)
-                .items(List.of(OrderItemRequest.builder().productId(1L).quantity(10).build()))
-                .build();
+        OrderRequest request = orderRequest(List.of(OrderItemRequest.builder().productId(1L).quantity(10).build()));
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer()));
         when(productRepository.findAllById(List.of(1L))).thenReturn(List.of(product));
         when(productService.reduceStock(product, 10))
                 .thenThrow(new BusinessRuleException("Insufficient stock for product 'Wireless Mouse': requested 10, available 2"));
 
         // Act & Assert
-        assertThatThrownBy(() -> orderService.placeOrder(request))
+        assertThatThrownBy(() -> orderService.placeOrder(1L, request))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Insufficient stock");
         verify(orderRepository, never()).save(any());
@@ -175,19 +164,14 @@ class OrderServiceTest {
     void should_logLowStockWarning_when_remainingStockBelowThreshold() {
         // Arrange
         Product mouse = Product.builder().id(1L).name("Wireless Mouse").price(new BigDecimal("24.99")).stockQuantity(9).build();
-        OrderRequest request = OrderRequest.builder()
-                .customerId(1L)
-                .shippingAddress("123 Maple Street")
-                .paymentMethod(PaymentMethod.CREDIT_CARD)
-                .items(List.of(OrderItemRequest.builder().productId(1L).quantity(1).build()))
-                .build();
+        OrderRequest request = orderRequest(List.of(OrderItemRequest.builder().productId(1L).quantity(1).build()));
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer()));
         when(productRepository.findAllById(List.of(1L))).thenReturn(List.of(mouse));
         when(productService.reduceStock(mouse, 1)).thenReturn(mouse);
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        orderService.placeOrder(request);
+        orderService.placeOrder(1L, request);
 
         // Assert
         assertThat(logAppender.list)
@@ -199,19 +183,14 @@ class OrderServiceTest {
     void should_notLogLowStockWarning_when_remainingStockAtOrAboveThreshold() {
         // Arrange
         Product mouse = Product.builder().id(1L).name("Wireless Mouse").price(new BigDecimal("24.99")).stockQuantity(10).build();
-        OrderRequest request = OrderRequest.builder()
-                .customerId(1L)
-                .shippingAddress("123 Maple Street")
-                .paymentMethod(PaymentMethod.CREDIT_CARD)
-                .items(List.of(OrderItemRequest.builder().productId(1L).quantity(1).build()))
-                .build();
+        OrderRequest request = orderRequest(List.of(OrderItemRequest.builder().productId(1L).quantity(1).build()));
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer()));
         when(productRepository.findAllById(List.of(1L))).thenReturn(List.of(mouse));
         when(productService.reduceStock(mouse, 1)).thenReturn(mouse);
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        orderService.placeOrder(request);
+        orderService.placeOrder(1L, request);
 
         // Assert
         assertThat(logAppender.list).noneMatch(event -> event.getLevel() == Level.WARN);
@@ -263,6 +242,49 @@ class OrderServiceTest {
 
         // Assert
         assertThat(responses).extracting(OrderResponse::getOrderNumber).containsExactly("ORD-AAAA0001", "ORD-BBBB0002");
+    }
+
+    @Test
+    void should_returnOwnOrders_when_getOrdersForCustomer() {
+        // Arrange
+        Order order = Order.builder().id(1L).orderNumber("ORD-AAAA0001").customer(customer())
+                .status(OrderStatus.PENDING).totalAmount(BigDecimal.ZERO).shippingAddress("123 Test St").items(new ArrayList<>()).build();
+        when(orderRepository.findByCustomerId(1L)).thenReturn(List.of(order));
+
+        // Act
+        List<OrderResponse> responses = orderService.getOrdersForCustomer(1L);
+
+        // Assert
+        assertThat(responses).extracting(OrderResponse::getOrderNumber).containsExactly("ORD-AAAA0001");
+    }
+
+    @Test
+    void should_returnOrder_when_getOrderForCustomer_andOrderBelongsToCaller() {
+        // Arrange
+        Order order = Order.builder().id(1L).orderNumber("ORD-TEST0001").customer(customer())
+                .status(OrderStatus.PENDING).totalAmount(new BigDecimal("100.00"))
+                .shippingAddress("123 Test St").items(new ArrayList<>()).build();
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+
+        // Act
+        OrderResponse response = orderService.getOrderForCustomer(1L, 1L);
+
+        // Assert
+        assertThat(response.getOrderNumber()).isEqualTo("ORD-TEST0001");
+    }
+
+    @Test
+    void should_throwAccessDenied_when_getOrderForCustomer_andOrderBelongsToAnother() {
+        // Arrange
+        Order order = Order.builder().id(1L).orderNumber("ORD-TEST0001").customer(customer())
+                .status(OrderStatus.PENDING).totalAmount(new BigDecimal("100.00"))
+                .shippingAddress("123 Test St").items(new ArrayList<>()).build();
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+
+        // Act & Assert
+        assertThatThrownBy(() -> orderService.getOrderForCustomer(1L, 99L))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("does not belong");
     }
 
     @Test

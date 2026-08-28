@@ -47,6 +47,22 @@ CREATE TABLE customers (
     UNIQUE KEY uk_customers_email (email)
 );
 
+-- users (authentication / authorization)
+CREATE TABLE users (
+    id          BIGINT        NOT NULL AUTO_INCREMENT,
+    email       VARCHAR(255)  NOT NULL,
+    password    VARCHAR(100)  NOT NULL,          -- BCrypt hash ($2a$, 60 chars); 100 for headroom
+    role        VARCHAR(20)   NOT NULL,          -- 'ROLE_ADMIN' | 'ROLE_CUSTOMER'
+    customer_id BIGINT,                          -- NULL for ADMIN, set for CUSTOMER
+    enabled     BOOLEAN       NOT NULL DEFAULT TRUE,
+    created_at  DATETIME,
+    updated_at  DATETIME,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_users_email (email),
+    UNIQUE KEY uk_users_customer_id (customer_id),
+    CONSTRAINT fk_users_customer FOREIGN KEY (customer_id) REFERENCES customers (id)
+);
+
 -- orders
 CREATE TABLE orders (
     id               BIGINT        NOT NULL AUTO_INCREMENT,
@@ -110,6 +126,7 @@ CREATE INDEX idx_orders_customer     ON orders      (customer_id);
 CREATE INDEX idx_orders_status       ON orders      (status);
 CREATE INDEX idx_order_items_order   ON order_items (order_id);
 CREATE INDEX idx_order_items_product ON order_items (product_id);
+CREATE INDEX idx_users_role          ON users       (role);
 
 -- ---------------------------------------------------------------------------
 -- Seed data (reference data + customers only).
@@ -144,6 +161,21 @@ INSERT INTO customers (first_name, last_name, email, phone, address, created_at)
 ('Jane',  'Smith', 'jane.smith@example.com', '+1-202-555-0142', '88 Oak Avenue, Riverdale',       NOW()),
 ('Ravi',  'Kumar', 'ravi.kumar@example.com', '+91-90000-12345', '12 MG Road, Bengaluru',          NOW());
 
+-- users
+-- Plaintext passwords (DEMO ONLY):
+--   admin@shop.example.com  -> "admin123"     (ROLE_ADMIN, not linked to a customer)
+--   john.doe@example.com    -> "password123"  (ROLE_CUSTOMER, customer 1)
+--   jane.smith@example.com  -> "password123"  (ROLE_CUSTOMER, customer 2)
+--   ravi.kumar@example.com  -> "password123"  (ROLE_CUSTOMER, customer 3)
+-- Regenerate a hash with:
+--   htpasswd -bnBC 10 "" 'admin123' | tr -d ':\n' | sed 's/^\$2y/\$2a/'
+--   (or new BCryptPasswordEncoder().encode("admin123"))
+INSERT INTO users (email, password, role, customer_id, enabled, created_at, updated_at) VALUES
+('admin@shop.example.com', '$2a$10$s6yUkD9fsw5tMpiVnu4Xwe1hBYuVL4345DHJeCE1xqfThZ4s46RwS', 'ROLE_ADMIN',    NULL, TRUE, NOW(), NOW()),
+('john.doe@example.com',   '$2a$10$GETQiwsC.fx2V45UMXWAdeBU596dtFeSZstdQXuFyf2y4A1dw4o/O', 'ROLE_CUSTOMER', 1,    TRUE, NOW(), NOW()),
+('jane.smith@example.com', '$2a$10$GETQiwsC.fx2V45UMXWAdeBU596dtFeSZstdQXuFyf2y4A1dw4o/O', 'ROLE_CUSTOMER', 2,    TRUE, NOW(), NOW()),
+('ravi.kumar@example.com', '$2a$10$GETQiwsC.fx2V45UMXWAdeBU596dtFeSZstdQXuFyf2y4A1dw4o/O', 'ROLE_CUSTOMER', 3,    TRUE, NOW(), NOW());
+
 -- reviews
 INSERT INTO reviews (product_id, customer_id, rating, comment, created_at) VALUES
 (1, 1, 5, 'Great mouse, very responsive and comfortable to use daily.', NOW()),
@@ -157,6 +189,7 @@ INSERT INTO reviews (product_id, customer_id, rating, comment, created_at) VALUE
 SELECT * FROM categories;
 SELECT * FROM products;
 SELECT * FROM customers;
+SELECT * FROM users;
 SELECT * FROM orders;
 SELECT * FROM order_items;
 SELECT * FROM payments;

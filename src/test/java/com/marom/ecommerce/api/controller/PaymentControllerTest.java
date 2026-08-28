@@ -4,6 +4,9 @@ import java.math.BigDecimal;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -14,6 +17,7 @@ import com.marom.ecommerce.api.entity.PaymentStatus;
 import com.marom.ecommerce.api.exception.BusinessRuleException;
 import com.marom.ecommerce.api.exception.ResourceNotFoundException;
 import com.marom.ecommerce.api.service.PaymentService;
+import com.marom.ecommerce.api.support.SecurityTestSupport;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -22,7 +26,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(PaymentController.class)
+@Import(SecurityTestSupport.class)
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
+@WithMockUser(roles = "ADMIN")
 class PaymentControllerTest {
 
     private final MockMvc mockMvc;
@@ -103,5 +109,23 @@ class PaymentControllerTest {
         // Act & Assert
         mockMvc.perform(put("/api/v1/payments/1/complete"))
                 .andExpect(status().isUnprocessableEntity());
+    }
+
+    // ----- security -----
+
+    @Test
+    @WithAnonymousUser
+    void should_return401_when_noAuthOnGet() throws Exception {
+        // Act & Assert
+        mockMvc.perform(get("/api/v1/payments/1"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void should_return403_when_customerRoleOnComplete() throws Exception {
+        // Act & Assert
+        mockMvc.perform(put("/api/v1/payments/1/complete"))
+                .andExpect(status().isForbidden());
     }
 }

@@ -5,7 +5,10 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -16,6 +19,7 @@ import com.marom.ecommerce.api.dto.ProductResponse;
 import com.marom.ecommerce.api.exception.DuplicateResourceException;
 import com.marom.ecommerce.api.exception.ResourceNotFoundException;
 import com.marom.ecommerce.api.service.ProductService;
+import com.marom.ecommerce.api.support.SecurityTestSupport;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -29,7 +33,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ProductController.class)
+@Import(SecurityTestSupport.class)
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
+@WithMockUser(roles = "ADMIN")
 class ProductControllerTest {
 
     private final MockMvc mockMvc;
@@ -232,6 +238,30 @@ class ProductControllerTest {
         mockMvc.perform(post("/api/v1/products").contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    @WithAnonymousUser
+    void should_return401_when_noAuthOnCreate() throws Exception {
+        // Arrange
+        ProductRequest request = validProductRequest();
+
+        // Act & Assert
+        mockMvc.perform(post("/api/v1/products").contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void should_return403_when_customerRoleOnCreate() throws Exception {
+        // Arrange
+        ProductRequest request = validProductRequest();
+
+        // Act & Assert
+        mockMvc.perform(post("/api/v1/products").contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
     }
 
     // ----- GET /api/v1/products/{id} -----
