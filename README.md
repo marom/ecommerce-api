@@ -83,6 +83,15 @@ mysql -u root < db/example-data.sql    # loads demo rows + accounts
 ./mvnw spring-boot:run
 ```
 
+`db/example-data.sql` seeds each product with 2-5 tiny placeholder pictures. To
+swap in real, keyword-matched photos (from loremflickr.com, picsum.photos as
+fallback), run this against a live API:
+
+```bash
+./db/load-example-pictures.sh                                  # API on :8080
+API_BASE=http://localhost:18080 ./db/load-example-pictures.sh  # or elsewhere
+```
+
 ## API
 
 Base path: `/api/v1`. All endpoints consume/produce JSON.
