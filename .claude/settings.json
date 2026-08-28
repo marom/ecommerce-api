@@ -40,7 +40,12 @@
       "Bash(curl -s -o /dev/null -w '8080 GET /products/1/pictures -> %{http_code}\\\\n' http://localhost:8080/api/v1/products/1/pictures)",
       "Bash(curl -s -o /dev/null -w '8080 GET /products -> %{http_code}\\\\n' http://localhost:8080/api/v1/products)",
       "Bash(mysql --protocol=tcp -h127.0.0.1 -uroot ecommerce_db -e \"SELECT product_id,COUNT\\(*\\),GROUP_CONCAT\\(DISTINCT content_type\\) FROM product_pictures GROUP BY product_id;\")",
-      "Bash(pkill -f \"server.port=18080\")"
+      "Bash(pkill -f \"server.port=18080\")",
+      "Bash(gh api *)",
+      "Bash(git ls-remote *)",
+      "Bash(git clone *)",
+      "Bash(grep -vE '^\\\\.git$|^\\\\.$|^\\\\.\\\\.$|target')",
+      "Bash(grep -vE '^\\\\.git$|^\\\\.$|^\\\\.\\\\.$|^target$')"
     ]
   },
   "hooks": {
