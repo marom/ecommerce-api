@@ -28,6 +28,7 @@ src/main/java/com/marom/ecommerce/api/
   security/     JWT issue/validate, current-user resolution, 401/403 handlers
 db/schema.sql        authoritative schema (DDL only)
 db/example-data.sql  demo rows: reference data + demo accounts
+db/load-example-pictures.sh  swap placeholder product images for real photos
 ```
 
 ## Configuration
@@ -146,6 +147,28 @@ token.
 | `GET`    | `/api/v1/users` | `ROLE_ADMIN` | List user accounts |
 | `PUT`    | `/api/v1/users/{id}/role` | `ROLE_ADMIN` | Change a user's role |
 
+### Product pictures
+
+Image bytes are stored in the `product_pictures` table (`LONGBLOB`) and served by
+`GET /api/v1/products/{productId}/pictures/{id}/content`. Listing a product embeds its
+picture metadata in `ProductResponse.pictures`, ordered by `displayOrder` (lowest first
+= primary); the blob itself is never loaded for catalog reads.
+
+Uploads are `multipart/form-data` with one or more `files` parts:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/products/1/pictures \
+  -H "Authorization: Bearer $TOKEN" \
+  -F 'files=@front.jpg;type=image/jpeg' \
+  -F 'files=@side.png;type=image/png'
+```
+
+| Rule | Violation |
+|---|---|
+| `image/jpeg`, `image/png`, `image/webp` only | `422` |
+| Max 10 pictures per product | `422` |
+| Max 5 MB per file, 30 MB per request | `413` |
+
 ### Interactive docs
 
 - Swagger UI: <http://localhost:8080/swagger-ui.html> (use **Authorize** with a bearer token)
@@ -172,12 +195,23 @@ All errors return an `ErrorResponse` JSON body via `GlobalExceptionHandler`:
 ## Tests
 
 ```bash
-./mvnw test
+./mvnw test      # unit + @WebMvcTest slices — no database needed
+./mvnw verify    # the above plus SecurityEndToEndIT — needs a seeded MySQL
 ```
 
 Unit tests use JUnit 5 + Mockito + AssertJ; controllers are covered with
-`@WebMvcTest` slices. JaCoCo coverage is written to
-`target/site/jacoco/index.html`.
+`@WebMvcTest` slices. `SecurityEndToEndIT` boots the full context against a real
+MySQL loaded from `db/schema.sql` + `db/example-data.sql` and logs in with the
+seeded accounts, so run it only after loading both files. JaCoCo coverage is
+written to `target/site/jacoco/index.html`.
+
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`) on every push and PR to `master`:
+spins up MySQL 8.4, loads `db/schema.sql` + `db/example-data.sql`, runs
+`./mvnw verify`, and uploads the surefire/JaCoCo reports. Pushes to the default
+branch additionally build and push `ghcr.io/marom/ecommerce-api:latest` and
+`:sha-<commit>`.
 
 ## Container image
 
