@@ -36,6 +36,12 @@ Sub-packages:
   the authority (`ROLE_ADMIN` / `ROLE_CUSTOMER`).
 - The customer for an order/review is taken from the authenticated principal via
   `CurrentUserService`, **not** a `customerId` in the request body.
+- Product pictures live under `/api/v1/products/{productId}/pictures` (like reviews): reads
+  are public (incl. `GET .../{id}/content`), and upload/update/delete are `ROLE_ADMIN` —
+  already covered by the broad `POST/PUT/DELETE /api/v1/products/**` rules. Bytes are stored
+  in the `product_pictures` table (`LONGBLOB`); metadata reads use projection queries so the
+  BLOB never loads during catalog reads. Uploads are `multipart/form-data` (`files` parts);
+  oversize → 413, bad content type / empty / picture-limit → 422.
 - 401/403 from the filter chain are rendered as `ErrorResponse` by
   `RestAuthenticationEntryPoint` / `RestAccessDeniedHandler`; `@PreAuthorize` denials and
   Spring Security auth exceptions are mapped in `GlobalExceptionHandler`.
@@ -57,7 +63,9 @@ All handled in `GlobalExceptionHandler`, returning `ErrorResponse` JSON:
 
 ## Database
 - MySQL, database `ecommerce_db`.
-- `ddl-auto=validate` — tables come from `schema.sql`, not Hibernate.
+- `ddl-auto=validate` — tables come from `schema.sql`, not Hibernate. Any new
+  table/column (e.g. `product_pictures`) must be hand-added to `db/schema.sql` or startup
+  validation fails.
 
 ## Commands
 - Run: `./mvnw spring-boot:run`

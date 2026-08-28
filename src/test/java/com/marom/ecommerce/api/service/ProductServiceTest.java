@@ -1,9 +1,11 @@
 package com.marom.ecommerce.api.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -18,11 +20,16 @@ import com.marom.ecommerce.api.exception.BusinessRuleException;
 import com.marom.ecommerce.api.exception.DuplicateResourceException;
 import com.marom.ecommerce.api.exception.ResourceNotFoundException;
 import com.marom.ecommerce.api.repository.CategoryRepository;
+import com.marom.ecommerce.api.repository.ProductPictureRepository;
+import com.marom.ecommerce.api.repository.ProductPictureView;
 import com.marom.ecommerce.api.repository.ProductRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,11 +43,64 @@ class ProductServiceTest {
     @Mock
     private CategoryRepository categoryRepository;
 
+    @Mock
+    private ProductPictureRepository productPictureRepository;
+
     @InjectMocks
     private ProductService productService;
 
+    @BeforeEach
+    void stubEmptyPicturesByDefault() {
+        lenient().when(productPictureRepository.findViewsByProductId(anyLong())).thenReturn(List.of());
+        lenient().when(productPictureRepository.findViewsByProductIdIn(any())).thenReturn(List.of());
+    }
+
     private static Category category() {
         return Category.builder().id(1L).name("Electronics").slug("electronics").build();
+    }
+
+    private static ProductPictureView view(long id, long productId, int displayOrder) {
+        return new ProductPictureView() {
+            @Override
+            public Long getId() {
+                return id;
+            }
+
+            @Override
+            public Long getProductId() {
+                return productId;
+            }
+
+            @Override
+            public String getAltText() {
+                return null;
+            }
+
+            @Override
+            public Integer getDisplayOrder() {
+                return displayOrder;
+            }
+
+            @Override
+            public String getContentType() {
+                return "image/jpeg";
+            }
+
+            @Override
+            public Long getSizeBytes() {
+                return 3L;
+            }
+
+            @Override
+            public String getOriginalFilename() {
+                return "pic-" + id + ".jpg";
+            }
+
+            @Override
+            public LocalDateTime getCreatedAt() {
+                return LocalDateTime.now();
+            }
+        };
     }
 
     @Test
@@ -263,7 +323,44 @@ class ProductServiceTest {
         productService.deleteProduct(1L);
 
         // Assert
+        verify(productPictureRepository).deleteByProductId(1L);
         verify(productRepository).delete(product);
+    }
+
+    @Test
+    void should_includePictures_when_gettingProduct() {
+        // Arrange
+        Product product = Product.builder().id(1L).name("Wireless Mouse").category(category()).build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(productPictureRepository.findViewsByProductId(1L))
+                .thenReturn(List.of(view(5L, 1L, 0), view(6L, 1L, 1)));
+
+        // Act
+        ProductResponse response = productService.getProduct(1L);
+
+        // Assert
+        assertThat(response.getPictures()).extracting(p -> p.getId(), p -> p.getUrl())
+                .containsExactly(
+                        tuple(5L, "/api/v1/products/1/pictures/5/content"),
+                        tuple(6L, "/api/v1/products/1/pictures/6/content"));
+    }
+
+    @Test
+    void should_batchFetchPictures_when_listingAllProducts() {
+        // Arrange
+        Product first = Product.builder().id(1L).name("Wireless Mouse").category(category()).build();
+        Product second = Product.builder().id(2L).name("Mechanical Keyboard").category(category()).build();
+        when(productRepository.findAll()).thenReturn(List.of(first, second));
+        when(productPictureRepository.findViewsByProductIdIn(any()))
+                .thenReturn(List.of(view(10L, 1L, 0), view(11L, 2L, 0), view(12L, 2L, 1)));
+
+        // Act
+        List<ProductResponse> responses = productService.getAllProducts();
+
+        // Assert
+        verify(productPictureRepository, never()).findViewsByProductId(anyLong());
+        assertThat(responses).extracting(r -> r.getName(), r -> r.getPictures().size())
+                .containsExactly(tuple("Wireless Mouse", 1), tuple("Mechanical Keyboard", 2));
     }
 
     @Test

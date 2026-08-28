@@ -2,6 +2,7 @@ package com.marom.ecommerce.api.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
@@ -34,6 +35,8 @@ public class ProductResponse {
     private Long categoryId;
     @Schema(description = "Name of the category this product belongs to", example = "Electronics")
     private String categoryName;
+    @Schema(description = "Pictures attached to this product, ordered by display order (first = primary)")
+    private List<ProductPictureResponse> pictures;
     @Schema(description = "When the product was created")
     private LocalDateTime createdAt;
     @Schema(description = "When the product was last updated")
