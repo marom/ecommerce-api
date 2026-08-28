@@ -1,0 +1,46 @@
+name: ecommerce-api
+
+services:
+  mysql:
+    image: mysql:8.4
+    # Values are interpolated from .env at parse time — no secrets live in this file.
+    # `:?` makes compose fail fast if .env is missing the variable.
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?set MYSQL_DATABASE in .env}
+    ports:
+      # host 3307 -> container 3306, so it does not clash with a local MySQL on 3306
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # Runs only on first start (empty data dir). db/schema.sql does its own
+      # DROP/CREATE DATABASE, so MYSQL_DATABASE above must match the name there.
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      # $$ escapes compose interpolation; the shell in the container expands the
+      # real env var, so the password is never rendered into the compose config.
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+    # Overrides the hardcoded localhost:3306 datasource in application.properties.
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
