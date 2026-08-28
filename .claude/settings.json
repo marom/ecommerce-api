@@ -1,4 +1,35 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(./mvnw test *)",
+      "Bash(./mvnw verify *)",
+      "Bash(./mvnw -q -Dtest='void' -Dit.test=SecurityEndToEndIT failsafe:integration-test failsafe:verify)",
+      "Bash(./mvnw -Dsurefire.failIfNoSpecifiedTests=false -Dtest=NONE -Dit.test=SecurityEndToEndIT verify)",
+      "Bash(unzip -l ~/.m2/repository/tools/jackson/core/jackson-databind/3.1.4/jackson-databind-3.1.4.jar)",
+      "Bash(./mvnw clean *)",
+      "Bash(pkill -f \"spring-boot:run\")",
+      "Bash(pkill -f \"spring-boot.run.arguments\")",
+      "Bash(curl -s -o /dev/null -w \"8081 now: %{http_code}\\\\n\" http://localhost:8081/actuator/health --max-time 2)",
+      "Bash(mysql -h 127.0.0.1 -uroot ecommerce_db -e \"DELETE FROM payments; DELETE FROM order_items; DELETE FROM orders; DELETE FROM reviews WHERE customer_id > 3; DELETE FROM products WHERE sku LIKE 'SMOKE-%' OR sku LIKE 'NOAUTH-%' OR sku LIKE 'IT-%'; DELETE FROM users WHERE customer_id > 3 OR email LIKE 'newbie%'; DELETE FROM customers WHERE id > 3;\")",
+      "Bash(curl -s -o /dev/null -w \"8081: %{http_code}\\\\n\" --max-time 2 http://localhost:8081/actuator/health)",
+      "Bash(mysql -h 127.0.0.1 -uroot ecommerce_db -e \"SELECT id,email,role,customer_id FROM users;\")",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git reset *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --base master --head feat/jwt-security-layer --title 'feat: JWT security layer, seed accounts, and admin user management' --body ' *)",
+      "Bash(gh pr *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(git pull *)",
+      "Bash(git branch *)",
+      "Bash(./mvnw -q test -Dtest='ProductPictureServiceTest,ProductPictureControllerTest,ProductServiceTest,ProductControllerTest,GlobalExceptionHandler*')",
+      "Bash(mysql --protocol=tcp -h127.0.0.1 -uroot ecommerce_db -e ' *)",
+      "Bash(pkill -f \"spring-boot.run.arguments=--server.port=18080\")",
+      "Bash(pkill -f \"18080\")",
+      "Bash(gh auth *)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
