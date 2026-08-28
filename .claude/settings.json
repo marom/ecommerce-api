@@ -27,7 +27,15 @@
       "Bash(mysql --protocol=tcp -h127.0.0.1 -uroot ecommerce_db -e ' *)",
       "Bash(pkill -f \"spring-boot.run.arguments=--server.port=18080\")",
       "Bash(pkill -f \"18080\")",
-      "Bash(gh auth *)"
+      "Bash(gh auth *)",
+      "Bash(mysql --protocol=tcp -h127.0.0.1 -uroot)",
+      "Bash(xargs cat)",
+      "Bash(git ls-tree *)",
+      "Bash(chmod +x db/load-example-pictures.sh)",
+      "Bash(git update-index *)",
+      "Bash(bash -n db/load-example-pictures.sh)",
+      "Bash(command -v shellcheck)",
+      "Bash(shellcheck db/load-example-pictures.sh)"
     ]
   },
   "hooks": {
