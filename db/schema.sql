@@ -1,6 +1,5 @@
---
---https://docs.fedoraproject.org/en-US/quick-docs/installing-mysql-mariadb/
---
+-- Reference:
+-- https://docs.fedoraproject.org/en-US/quick-docs/installing-mysql-mariadb/
 DROP DATABASE IF EXISTS ecommerce_db;
 CREATE DATABASE ecommerce_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE ecommerce_db;
