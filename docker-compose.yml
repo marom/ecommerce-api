@@ -13,9 +13,11 @@ services:
       - "3307:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      # Runs only on first start (empty data dir). db/schema.sql does its own
-      # DROP/CREATE DATABASE, so MYSQL_DATABASE above must match the name there.
+      # Run only on first start (empty data dir), in filename order. db/schema.sql
+      # does its own DROP/CREATE DATABASE, so MYSQL_DATABASE above must match the
+      # name there; db/example-data.sql then loads the demo rows.
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db/example-data.sql:/docker-entrypoint-initdb.d/02-example-data.sql:ro
     healthcheck:
       # $$ escapes compose interpolation; the shell in the container expands the
       # real env var, so the password is never rendered into the compose config.

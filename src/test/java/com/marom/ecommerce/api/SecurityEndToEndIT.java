@@ -15,8 +15,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Full-context security smoke test. Requires the MySQL database seeded from
- * {@code db/schema.sql} (which now includes the {@code users} table and demo accounts).
+ * Full-context security smoke test. Requires the MySQL database built from
+ * {@code db/schema.sql} and seeded from {@code db/example-data.sql} (which provides the
+ * demo {@code users} / accounts this test logs in with).
  * Runs under Failsafe during {@code mvn verify}, not the fast {@code mvn test} suite.
  */
 @SpringBootTest
