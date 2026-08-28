@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.marom.ecommerce.api.dto.ErrorResponse;
 import com.marom.ecommerce.api.dto.ReviewRequest;
 import com.marom.ecommerce.api.dto.ReviewResponse;
+import com.marom.ecommerce.api.security.CurrentUserService;
 import com.marom.ecommerce.api.service.ReviewService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,13 +34,18 @@ import lombok.RequiredArgsConstructor;
 public class ReviewController {
 
     private final ReviewService reviewService;
+    private final CurrentUserService currentUser;
 
     @PostMapping
     @Operation(summary = "Post a review for a product",
-            description = "Each customer may post at most one review per product")
+            description = "Posted as the authenticated customer. Each customer may post at most one review per product.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Review created"),
             @ApiResponse(responseCode = "400", description = "Validation failed",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Not authenticated",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Caller is not a customer",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "Product or customer not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
@@ -48,7 +54,8 @@ public class ReviewController {
     })
     public ResponseEntity<ReviewResponse> create(@Parameter(description = "Product ID") @PathVariable Long productId,
             @Valid @RequestBody ReviewRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(reviewService.createReview(productId, request));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(reviewService.createReview(productId, currentUser.currentCustomerId(), request));
     }
 
     @GetMapping

@@ -23,6 +23,7 @@ import com.marom.ecommerce.api.entity.OrderStatus;
 import com.marom.ecommerce.api.entity.Payment;
 import com.marom.ecommerce.api.entity.PaymentStatus;
 import com.marom.ecommerce.api.entity.Product;
+import com.marom.ecommerce.api.exception.AccessDeniedException;
 import com.marom.ecommerce.api.exception.BusinessRuleException;
 import com.marom.ecommerce.api.exception.ResourceNotFoundException;
 import com.marom.ecommerce.api.repository.CustomerRepository;
@@ -54,9 +55,10 @@ public class OrderService {
     private final ProductService productService;
 
     // Business rule: stock is reduced when the order is placed, not at shipment.
-    public OrderResponse placeOrder(OrderRequest request) {
-        Customer customer = customerRepository.findById(request.getCustomerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Customer not found with id " + request.getCustomerId()));
+    // The customer is the authenticated caller, resolved by the controller.
+    public OrderResponse placeOrder(Long customerId, OrderRequest request) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found with id " + customerId));
 
         Order order = Order.builder()
                 .customer(customer)
@@ -108,6 +110,21 @@ public class OrderService {
     @Transactional(readOnly = true)
     public List<OrderResponse> getAllOrders() {
         return orderRepository.findAll().stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getOrdersForCustomer(Long customerId) {
+        return orderRepository.findByCustomerId(customerId).stream().map(this::toResponse).toList();
+    }
+
+    // A customer may only read their own orders; anyone else's is a 403.
+    @Transactional(readOnly = true)
+    public OrderResponse getOrderForCustomer(Long id, Long customerId) {
+        Order order = findOrderOrThrow(id);
+        if (!order.getCustomer().getId().equals(customerId)) {
+            throw new AccessDeniedException("Order " + id + " does not belong to the current customer");
+        }
+        return toResponse(order);
     }
 
     // Business rule: transitions must follow ALLOWED_TRANSITIONS. Cancelling restores stock for

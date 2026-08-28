@@ -45,7 +45,7 @@ class ReviewServiceTest {
     @Test
     void should_createReview_when_productAndCustomerExistAndNoDuplicate() {
         // Arrange
-        ReviewRequest request = ReviewRequest.builder().customerId(3L).rating(5).comment("Great product.").build();
+        ReviewRequest request = ReviewRequest.builder().rating(5).comment("Great product.").build();
         Product product = Product.builder().id(1L).name("Wireless Mouse").build();
         Customer customer = Customer.builder().id(3L).firstName("Ravi").lastName("Kumar").build();
         Review saved = Review.builder().id(10L).product(product).customer(customer).rating(5)
@@ -56,7 +56,7 @@ class ReviewServiceTest {
         when(reviewRepository.save(any(Review.class))).thenReturn(saved);
 
         // Act
-        ReviewResponse response = reviewService.createReview(1L, request);
+        ReviewResponse response = reviewService.createReview(1L, 3L, request);
 
         // Assert
         assertThat(response.getId()).isEqualTo(10L);
@@ -70,11 +70,11 @@ class ReviewServiceTest {
     @Test
     void should_throwDuplicateResourceException_when_customerAlreadyReviewedProduct() {
         // Arrange
-        ReviewRequest request = ReviewRequest.builder().customerId(3L).rating(4).comment("Solid.").build();
+        ReviewRequest request = ReviewRequest.builder().rating(4).comment("Solid.").build();
         when(reviewRepository.existsByProductIdAndCustomerId(1L, 3L)).thenReturn(true);
 
         // Act & Assert
-        assertThatThrownBy(() -> reviewService.createReview(1L, request))
+        assertThatThrownBy(() -> reviewService.createReview(1L, 3L, request))
                 .isInstanceOf(DuplicateResourceException.class)
                 .hasMessageContaining("1")
                 .hasMessageContaining("3");
@@ -84,12 +84,12 @@ class ReviewServiceTest {
     @Test
     void should_throwResourceNotFoundException_when_productDoesNotExistOnCreate() {
         // Arrange
-        ReviewRequest request = ReviewRequest.builder().customerId(3L).rating(4).comment("Solid.").build();
+        ReviewRequest request = ReviewRequest.builder().rating(4).comment("Solid.").build();
         when(reviewRepository.existsByProductIdAndCustomerId(404L, 3L)).thenReturn(false);
         when(productRepository.findById(404L)).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> reviewService.createReview(404L, request))
+        assertThatThrownBy(() -> reviewService.createReview(404L, 3L, request))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("404");
         verify(customerRepository, never()).findById(any());
@@ -99,14 +99,14 @@ class ReviewServiceTest {
     @Test
     void should_throwResourceNotFoundException_when_customerDoesNotExistOnCreate() {
         // Arrange
-        ReviewRequest request = ReviewRequest.builder().customerId(404L).rating(4).comment("Solid.").build();
+        ReviewRequest request = ReviewRequest.builder().rating(4).comment("Solid.").build();
         Product product = Product.builder().id(1L).name("Wireless Mouse").build();
         when(reviewRepository.existsByProductIdAndCustomerId(1L, 404L)).thenReturn(false);
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
         when(customerRepository.findById(404L)).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> reviewService.createReview(1L, request))
+        assertThatThrownBy(() -> reviewService.createReview(1L, 404L, request))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("404");
         verify(reviewRepository, never()).save(any());

@@ -4,7 +4,10 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -15,6 +18,7 @@ import com.marom.ecommerce.api.dto.CustomerResponse;
 import com.marom.ecommerce.api.exception.DuplicateResourceException;
 import com.marom.ecommerce.api.exception.ResourceNotFoundException;
 import com.marom.ecommerce.api.service.CustomerService;
+import com.marom.ecommerce.api.support.SecurityTestSupport;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -28,7 +32,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(CustomerController.class)
+@Import(SecurityTestSupport.class)
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
+@WithMockUser(roles = "ADMIN")
 class CustomerControllerTest {
 
     private final MockMvc mockMvc;
@@ -315,5 +321,23 @@ class CustomerControllerTest {
         // Act & Assert
         mockMvc.perform(delete("/api/v1/customers/404"))
                 .andExpect(status().isNotFound());
+    }
+
+    // ----- security -----
+
+    @Test
+    @WithAnonymousUser
+    void should_return401_when_noAuthOnList() throws Exception {
+        // Act & Assert
+        mockMvc.perform(get("/api/v1/customers"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void should_return403_when_customerRoleOnList() throws Exception {
+        // Act & Assert
+        mockMvc.perform(get("/api/v1/customers"))
+                .andExpect(status().isForbidden());
     }
 }

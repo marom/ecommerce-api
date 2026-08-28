@@ -5,7 +5,10 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -18,9 +21,12 @@ import com.marom.ecommerce.api.dto.OrderResponse;
 import com.marom.ecommerce.api.dto.OrderStatusRequest;
 import com.marom.ecommerce.api.entity.OrderStatus;
 import com.marom.ecommerce.api.entity.PaymentMethod;
+import com.marom.ecommerce.api.exception.AccessDeniedException;
 import com.marom.ecommerce.api.exception.BusinessRuleException;
 import com.marom.ecommerce.api.exception.ResourceNotFoundException;
 import com.marom.ecommerce.api.service.OrderService;
+import com.marom.ecommerce.api.support.SecurityTestSupport;
+import com.marom.ecommerce.api.support.WithMockCustomUser;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -32,7 +38,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(OrderController.class)
+@Import(SecurityTestSupport.class)
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
+@WithMockCustomUser(customerId = 1L)
 class OrderControllerTest {
 
     private final MockMvc mockMvc;
@@ -49,7 +57,6 @@ class OrderControllerTest {
     private OrderRequest validOrderRequest() {
         OrderItemRequest item = OrderItemRequest.builder().productId(1L).quantity(2).build();
         return OrderRequest.builder()
-                .customerId(1L)
                 .shippingAddress("123 Main St, Springfield")
                 .notes("Leave at the front door")
                 .paymentMethod(PaymentMethod.CREDIT_CARD)
@@ -80,8 +87,7 @@ class OrderControllerTest {
     void should_returnCreated_when_orderRequestIsValid() throws Exception {
         // Arrange
         OrderRequest request = validOrderRequest();
-        OrderResponse response = sampleOrderResponse();
-        when(orderService.placeOrder(any(OrderRequest.class))).thenReturn(response);
+        when(orderService.placeOrder(eq(1L), any(OrderRequest.class))).thenReturn(sampleOrderResponse());
 
         // Act & Assert
         mockMvc.perform(post("/api/v1/orders").contentType(MediaType.APPLICATION_JSON)
@@ -91,18 +97,6 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.orderNumber").value("ORD-20260812-0001"))
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.totalAmount").value(59.98));
-    }
-
-    @Test
-    void should_returnBadRequest_when_customerIdIsMissing() throws Exception {
-        // Arrange
-        OrderRequest request = validOrderRequest();
-        request.setCustomerId(null);
-
-        // Act & Assert
-        mockMvc.perform(post("/api/v1/orders").contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -181,7 +175,7 @@ class OrderControllerTest {
     void should_returnNotFound_when_customerDoesNotExistOnPlaceOrder() throws Exception {
         // Arrange
         OrderRequest request = validOrderRequest();
-        when(orderService.placeOrder(any(OrderRequest.class)))
+        when(orderService.placeOrder(eq(1L), any(OrderRequest.class)))
                 .thenThrow(new ResourceNotFoundException("Customer not found with id 1"));
 
         // Act & Assert
@@ -194,7 +188,7 @@ class OrderControllerTest {
     void should_returnUnprocessableEntity_when_stockIsInsufficientOnPlaceOrder() throws Exception {
         // Arrange
         OrderRequest request = validOrderRequest();
-        when(orderService.placeOrder(any(OrderRequest.class)))
+        when(orderService.placeOrder(eq(1L), any(OrderRequest.class)))
                 .thenThrow(new BusinessRuleException("Insufficient stock for product with id 1"));
 
         // Act & Assert
@@ -203,12 +197,30 @@ class OrderControllerTest {
                 .andExpect(status().isUnprocessableEntity());
     }
 
+    @Test
+    @WithAnonymousUser
+    void should_return401_when_noAuthOnPlaceOrder() throws Exception {
+        // Act & Assert
+        mockMvc.perform(post("/api/v1/orders").contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validOrderRequest())))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void should_return403_when_adminPlacesOrder() throws Exception {
+        // Act & Assert
+        mockMvc.perform(post("/api/v1/orders").contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validOrderRequest())))
+                .andExpect(status().isForbidden());
+    }
+
     // ----- GET /api/v1/orders/{id} -----
 
     @Test
-    void should_returnOk_when_orderExists() throws Exception {
+    void should_returnOk_when_customerGetsOwnOrder() throws Exception {
         // Arrange
-        when(orderService.getOrder(1L)).thenReturn(sampleOrderResponse());
+        when(orderService.getOrderForCustomer(1L, 1L)).thenReturn(sampleOrderResponse());
 
         // Act & Assert
         mockMvc.perform(get("/api/v1/orders/1"))
@@ -220,19 +232,43 @@ class OrderControllerTest {
     @Test
     void should_returnNotFound_when_orderDoesNotExistOnGet() throws Exception {
         // Arrange
-        when(orderService.getOrder(404L)).thenThrow(new ResourceNotFoundException("Order not found with id 404"));
+        when(orderService.getOrderForCustomer(404L, 1L))
+                .thenThrow(new ResourceNotFoundException("Order not found with id 404"));
 
         // Act & Assert
         mockMvc.perform(get("/api/v1/orders/404"))
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void should_returnForbidden_when_customerGetsAnotherCustomersOrder() throws Exception {
+        // Arrange
+        when(orderService.getOrderForCustomer(2L, 1L))
+                .thenThrow(new AccessDeniedException("Order 2 does not belong to the current customer"));
+
+        // Act & Assert
+        mockMvc.perform(get("/api/v1/orders/2"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void should_returnOk_when_adminGetsAnyOrder() throws Exception {
+        // Arrange
+        when(orderService.getOrder(1L)).thenReturn(sampleOrderResponse());
+
+        // Act & Assert
+        mockMvc.perform(get("/api/v1/orders/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1));
+    }
+
     // ----- GET /api/v1/orders -----
 
     @Test
-    void should_returnOk_when_listingAllOrders() throws Exception {
+    void should_returnOwnOrders_when_customerListsOrders() throws Exception {
         // Arrange
-        when(orderService.getAllOrders()).thenReturn(List.of(sampleOrderResponse()));
+        when(orderService.getOrdersForCustomer(1L)).thenReturn(List.of(sampleOrderResponse()));
 
         // Act & Assert
         mockMvc.perform(get("/api/v1/orders"))
@@ -241,9 +277,22 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$[0].orderNumber").value("ORD-20260812-0001"));
     }
 
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void should_returnAllOrders_when_adminListsOrders() throws Exception {
+        // Arrange
+        when(orderService.getAllOrders()).thenReturn(List.of(sampleOrderResponse()));
+
+        // Act & Assert
+        mockMvc.perform(get("/api/v1/orders"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1));
+    }
+
     // ----- PUT /api/v1/orders/{id}/status -----
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void should_returnOk_when_statusChangeIsValid() throws Exception {
         // Arrange
         OrderStatusRequest request = OrderStatusRequest.builder().status(OrderStatus.CONFIRMED).build();
@@ -259,6 +308,7 @@ class OrderControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void should_returnBadRequest_when_statusIsMissing() throws Exception {
         // Arrange
         OrderStatusRequest request = OrderStatusRequest.builder().build();
@@ -270,6 +320,7 @@ class OrderControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void should_returnNotFound_when_orderDoesNotExistOnStatusChange() throws Exception {
         // Arrange
         OrderStatusRequest request = OrderStatusRequest.builder().status(OrderStatus.CONFIRMED).build();
@@ -283,6 +334,7 @@ class OrderControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void should_returnUnprocessableEntity_when_statusTransitionIsNotAllowed() throws Exception {
         // Arrange
         OrderStatusRequest request = OrderStatusRequest.builder().status(OrderStatus.DELIVERED).build();
@@ -293,5 +345,16 @@ class OrderControllerTest {
         mockMvc.perform(put("/api/v1/orders/1/status").contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void should_returnForbidden_when_customerChangesOrderStatus() throws Exception {
+        // Arrange
+        OrderStatusRequest request = OrderStatusRequest.builder().status(OrderStatus.CONFIRMED).build();
+
+        // Act & Assert
+        mockMvc.perform(put("/api/v1/orders/1/status").contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
     }
 }

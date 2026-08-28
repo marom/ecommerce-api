@@ -12,7 +12,10 @@ COPY mvnw pom.xml ./
 RUN --mount=type=cache,target=/root/.m2 \
     chmod +x mvnw && ./mvnw -B -q dependency:go-offline
 
-# Build
+# Build. lombok.config carries Spring's @Value/@Qualifier onto the constructor
+# params @RequiredArgsConstructor generates — without it, @Value on a final field
+# is silently dropped and the security beans fail to start.
+COPY lombok.config ./
 COPY src/ src/
 RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -q clean package -DskipTests
 

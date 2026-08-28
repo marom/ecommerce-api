@@ -18,12 +18,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Schema(description = "Request payload to place an order")
+@Schema(description = "Request payload to place an order. The customer is taken from the "
+        + "authenticated principal, not this body.")
 public class OrderRequest {
-
-    @Schema(description = "ID of the customer placing the order", example = "1")
-    @NotNull
-    private Long customerId;
 
     @Schema(description = "Address the order will be shipped to", example = "123 Main St, Springfield")
     @NotBlank

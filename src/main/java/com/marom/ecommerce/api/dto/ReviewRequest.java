@@ -15,12 +15,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Schema(description = "Request payload to post a review for a product")
+@Schema(description = "Request payload to post a review for a product. The customer is taken "
+        + "from the authenticated principal, not this body.")
 public class ReviewRequest {
-
-    @Schema(description = "ID of the customer posting the review", example = "1")
-    @NotNull
-    private Long customerId;
 
     @Schema(description = "Star rating from 1 (worst) to 5 (best)", example = "5")
     @NotNull

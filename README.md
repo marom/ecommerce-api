@@ -9,6 +9,7 @@ categories, customers, orders, payments, and product reviews.
 |---|---|
 | Language | Java 21 |
 | Framework | Spring Boot 4.1.0 (Web MVC, Data JPA, Validation, Actuator) |
+| Security | Spring Security + OAuth2 Resource Server (stateless JWT, HS256) |
 | Build | Maven (`./mvnw`) |
 | Database | MySQL 8.4 |
 | API docs | springdoc-openapi (Swagger UI) |
@@ -23,7 +24,8 @@ src/main/java/com/marom/ecommerce/api/
   entity/       JPA entities (tables come from db/schema.sql, not Hibernate)
   dto/          request/response payloads
   exception/    custom exceptions + GlobalExceptionHandler
-  config/       app configuration
+  config/       app configuration (SecurityConfig, CorsConfig, OpenApiConfig)
+  security/     JWT issue/validate, current-user resolution, 401/403 handlers
 db/schema.sql   authoritative schema + seed data
 ```
 
@@ -42,6 +44,13 @@ spring.jpa.hibernate.ddl-auto=validate
 `db/schema.sql` yourself (or use Docker Compose, which does it for you).
 Any property can be overridden with an environment variable, e.g.
 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`.
+
+### JWT secret
+
+HS256 signing uses `app.security.jwt.secret` (default in `application.properties` is a
+throwaway dev value). **Set `JWT_SECRET` (≥ 32 chars) in every real environment.**
+`app.security.jwt.expiration-seconds` (default 3600) and `app.security.jwt.issuer` are
+also configurable.
 
 ## Running
 
@@ -74,35 +83,54 @@ mysql -u root < db/schema.sql          # creates ecommerce_db + seed data
 
 Base path: `/api/v1`. All endpoints consume/produce JSON.
 
-| Method | Path | Description |
-|---|---|---|
-| `GET`    | `/api/v1/products` | List products |
-| `POST`   | `/api/v1/products` | Create a product |
-| `GET`    | `/api/v1/products/{id}` | Get a product |
-| `PUT`    | `/api/v1/products/{id}` | Update a product |
-| `DELETE` | `/api/v1/products/{id}` | Delete a product |
-| `GET`    | `/api/v1/categories` | List categories |
-| `POST`   | `/api/v1/categories` | Create a category |
-| `GET`    | `/api/v1/categories/{id}` | Get a category |
-| `PUT`    | `/api/v1/categories/{id}` | Update a category |
-| `DELETE` | `/api/v1/categories/{id}` | Delete a category |
-| `GET`    | `/api/v1/customers` | List customers |
-| `POST`   | `/api/v1/customers` | Create a customer |
-| `GET`    | `/api/v1/customers/{id}` | Get a customer |
-| `PUT`    | `/api/v1/customers/{id}` | Update a customer |
-| `DELETE` | `/api/v1/customers/{id}` | Delete a customer |
-| `GET`    | `/api/v1/orders` | List orders |
-| `POST`   | `/api/v1/orders` | Place an order |
-| `GET`    | `/api/v1/orders/{id}` | Get an order |
-| `PUT`    | `/api/v1/orders/{id}/status` | Change order status |
-| `GET`    | `/api/v1/payments/{id}` | Get a payment |
-| `PUT`    | `/api/v1/payments/{id}/complete` | Mark a payment complete |
-| `GET`    | `/api/v1/products/{productId}/reviews` | List reviews for a product |
-| `POST`   | `/api/v1/products/{productId}/reviews` | Post a review (one per customer per product) |
+### Authentication
+
+Stateless JWT bearer tokens. `POST /api/v1/auth/login` returns
+`{ "accessToken": "...", "tokenType": "Bearer", "expiresIn": 3600, "role": "...", "customerId": ... }`;
+send it as `Authorization: Bearer <token>` on protected calls.
+
+Seeded accounts (`db/schema.sql`, **demo passwords — change before any real use**):
+
+| Email | Password | Role | Linked customer |
+|---|---|---|---|
+| `admin@shop.example.com` | `admin123` | `ROLE_ADMIN` | — |
+| `john.doe@example.com` | `password123` | `ROLE_CUSTOMER` | John Doe (id 1) |
+| `jane.smith@example.com` | `password123` | `ROLE_CUSTOMER` | Jane Smith (id 2) |
+| `ravi.kumar@example.com` | `password123` | `ROLE_CUSTOMER` | Ravi Kumar (id 3) |
+
+`POST /api/v1/auth/register` creates a new `ROLE_CUSTOMER` account (with a linked
+customer record) and returns a token. In Swagger UI, click **Authorize** and paste the
+token.
+
+> **Contract change:** orders and reviews no longer take a `customerId` in the request
+> body — the customer is the authenticated caller. A customer sees/manages only their own
+> orders; admins see all. Admin accounts have no linked customer, so they cannot place
+> orders or post reviews.
+
+| Method | Path | Access | Description |
+|---|---|---|---|
+| `POST`   | `/api/v1/auth/login` | public | Obtain an access token |
+| `POST`   | `/api/v1/auth/register` | public | Register a customer, get a token |
+| `GET`    | `/api/v1/auth/me` | authenticated | Current user |
+| `GET`    | `/api/v1/products`, `/api/v1/products/{id}` | public | List / get products |
+| `POST` `PUT` `DELETE` | `/api/v1/products{/id}` | `ROLE_ADMIN` | Create / update / delete a product |
+| `GET`    | `/api/v1/categories`, `/api/v1/categories/{id}` | public | List / get categories |
+| `POST` `PUT` `DELETE` | `/api/v1/categories{/id}` | `ROLE_ADMIN` | Create / update / delete a category |
+| `GET` `POST` `PUT` `DELETE` | `/api/v1/customers{/id}` | `ROLE_ADMIN` | Manage customers |
+| `POST`   | `/api/v1/orders` | `ROLE_CUSTOMER` | Place an order (as the caller) |
+| `GET`    | `/api/v1/orders` | authenticated | Own orders (customer) / all orders (admin) |
+| `GET`    | `/api/v1/orders/{id}` | authenticated | Own order (customer) / any (admin) |
+| `PUT`    | `/api/v1/orders/{id}/status` | `ROLE_ADMIN` | Change order status |
+| `GET`    | `/api/v1/payments/{id}` | `ROLE_ADMIN` | Get a payment |
+| `PUT`    | `/api/v1/payments/{id}/complete` | `ROLE_ADMIN` | Mark a payment complete |
+| `GET`    | `/api/v1/products/{productId}/reviews` | public | List reviews for a product |
+| `POST`   | `/api/v1/products/{productId}/reviews` | `ROLE_CUSTOMER` | Post a review (as the caller; one per product) |
+| `GET`    | `/api/v1/users` | `ROLE_ADMIN` | List user accounts |
+| `PUT`    | `/api/v1/users/{id}/role` | `ROLE_ADMIN` | Change a user's role |
 
 ### Interactive docs
 
-- Swagger UI: <http://localhost:8080/swagger-ui.html>
+- Swagger UI: <http://localhost:8080/swagger-ui.html> (use **Authorize** with a bearer token)
 - OpenAPI JSON: <http://localhost:8080/v3/api-docs>
 
 ### Health
@@ -119,7 +147,9 @@ All errors return an `ErrorResponse` JSON body via `GlobalExceptionHandler`:
 | `ResourceNotFoundException` | `404 Not Found` |
 | `BusinessRuleException` | `422 Unprocessable Entity` |
 | `DuplicateResourceException` | `409 Conflict` |
-| `AccessDeniedException` | `403 Forbidden` |
+| `AccessDeniedException` (app or Spring Security) | `403 Forbidden` |
+| Missing / invalid / expired token | `401 Unauthorized` |
+| Bad credentials on login | `401 Unauthorized` |
 
 ## Tests
 
