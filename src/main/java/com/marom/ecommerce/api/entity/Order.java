@@ -25,6 +25,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 
 @Getter
 @Setter
@@ -64,6 +65,7 @@ public class Order extends Auditable {
     // Business rule: saving an order must cascade to its line items and its payment —
     // items/payment are only ever persisted, updated or removed as part of their owning order.
     @Builder.Default
+    @BatchSize(size = 100)
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 

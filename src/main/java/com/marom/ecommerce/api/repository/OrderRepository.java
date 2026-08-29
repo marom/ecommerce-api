@@ -13,13 +13,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByOrderNumber(String orderNumber);
 
     @Override
-    @EntityGraph(attributePaths = {"items", "items.product", "payment"})
+    @EntityGraph(attributePaths = {"customer", "payment"})
     List<Order> findAll();
 
     @Override
-    @EntityGraph(attributePaths = {"items", "items.product", "payment"})
+    @EntityGraph(attributePaths = {"customer", "payment"})
     Optional<Order> findById(Long id);
 
-    @EntityGraph(attributePaths = {"items", "items.product", "payment"})
+    @EntityGraph(attributePaths = {"customer", "payment"})
     List<Order> findByCustomerId(Long customerId);
 }
