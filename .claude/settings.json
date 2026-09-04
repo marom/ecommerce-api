@@ -45,7 +45,19 @@
       "Bash(git ls-remote *)",
       "Bash(git clone *)",
       "Bash(grep -vE '^\\\\.git$|^\\\\.$|^\\\\.\\\\.$|target')",
-      "Bash(grep -vE '^\\\\.git$|^\\\\.$|^\\\\.\\\\.$|^target$')"
+      "Bash(grep -vE '^\\\\.git$|^\\\\.$|^\\\\.\\\\.$|^target$')",
+      "Bash(export DOCKER_HOST=unix:///run/user/1000/docker.sock)",
+      "Bash(docker compose *)",
+      "Bash(cat /home/marom/VSProjects/claude-java-demo/docker-compose.yml 2>&1 | head -60)",
+      "Read(//home/marom/VSProjects/claude-java-demo/**)",
+      "Bash(DOCKER_HOST=unix:///run/user/1000/docker.sock docker compose stop)",
+      "Bash(docker volume *)",
+      "Read(//run/user/1000/**)",
+      "Bash(docker info *)",
+      "Bash(python3 -c ' *)",
+      "Bash(timeout 10 docker events --since 30m --until 0s --filter type=container --format '{{.Time}} {{.Action}} {{.Actor.Attributes.name}}')",
+      "Bash(docker network *)",
+      "Bash(timeout 10 docker events --since 30m --until 0s --filter type=network --filter type=volume --format '{{.Time}} {{.Type}} {{.Action}} {{.Actor.Attributes.name}}')"
     ]
   },
   "hooks": {
