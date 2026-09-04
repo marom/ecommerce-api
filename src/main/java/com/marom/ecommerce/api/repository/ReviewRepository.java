@@ -12,5 +12,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @Query("SELECT r FROM Review r JOIN FETCH r.customer WHERE r.product.id = :productId")
     List<Review> findByProductId(Long productId);
 
+    List<Review> findByProductIdOrderByCreatedAtAsc(Long productId);
+
     boolean existsByProductIdAndCustomerId(Long productId, Long customerId);
 }
